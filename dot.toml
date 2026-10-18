@@ -1,0 +1,4 @@
+# Files linked into $HOME by `dot sync` (install.sh falls back to plain `ln -s` when `dot`
+# is not installed). Only hand-written files go here; see docs/sync-workflow.md.
+"claude/statusline-command.sh" = "~/.claude/statusline-command.sh"
+"codex/rules/default.rules" = "~/.codex/rules/default.rules"

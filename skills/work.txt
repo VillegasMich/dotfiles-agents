@@ -1,0 +1,8 @@
+# Work-only skills, installed with `./install.sh --work`. They need access to the work
+# GitLab, so they are skipped on personal machines. Same format as personal.txt.
+#
+# The twg-* skills are not listed here: `twg skills install` manages them (also --work).
+code-review                                    git@gitlab.com:geniussports/engage/auto-produced-video/apv-ai-tools.git
+code-review-solver                             git@gitlab.com:geniussports/engage/auto-produced-video/apv-ai-tools.git
+evaluate-skill                                 git@gitlab.com:geniussports/engage/auto-produced-video/apv-ai-tools.git
+mr-overview                                    git@gitlab.com:geniussports/engage/auto-produced-video/apv-ai-tools.git

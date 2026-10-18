@@ -1,0 +1,9 @@
+# Skills installed on every machine with the `skills` CLI (https://github.com/vercel-labs/skills).
+# Format: <skill name>  <source>   (source = GitHub owner/repo, git URL or local path)
+# Skills sharing a source are installed in one `skills add` call. See docs/skills.md.
+caveman                                        JuliusBrussee/caveman
+frontend-design                                anthropics/skills
+architecture-decision-record-maintainer-skill  architecture-decision-record/architecture-decision-record
+architecture-decision-record-skill             architecture-decision-record/architecture-decision-record
+orchestration                                  stablyai/orca
+find-skills                                    vercel-labs/skills

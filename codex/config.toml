@@ -1,0 +1,4 @@
+# Top-level keys merged into ~/.codex/config.toml by install.sh. Only keys listed here are
+# touched; [projects.*] trust entries and other tables stay machine-local.
+model = "gpt-5.5"
+model_reasoning_effort = "high"
