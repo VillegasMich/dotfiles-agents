@@ -7,3 +7,4 @@ architecture-decision-record-maintainer-skill  architecture-decision-record/arch
 architecture-decision-record-skill             architecture-decision-record/architecture-decision-record
 orchestration                                  stablyai/orca
 find-skills                                    vercel-labs/skills
+remotion-best-practices                        remotion-dev/skills
