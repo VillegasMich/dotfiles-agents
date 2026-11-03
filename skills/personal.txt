@@ -8,3 +8,34 @@ architecture-decision-record-skill             architecture-decision-record/arch
 orchestration                                  stablyai/orca
 find-skills                                    vercel-labs/skills
 remotion-best-practices                        remotion-dev/skills
+
+# Matt Pocock's engineering skills (grill → spec → tickets → tdd → code-review); orca-features
+# builds on them. With --work, work.txt's code-review replaces this one (see docs/skills.md).
+ask-matt                                       mattpocock/skills
+code-review                                    mattpocock/skills
+codebase-design                                mattpocock/skills
+diagnosing-bugs                                mattpocock/skills
+domain-modeling                                mattpocock/skills
+grill-me                                       mattpocock/skills
+grill-with-docs                                mattpocock/skills
+grilling                                       mattpocock/skills
+handoff                                        mattpocock/skills
+implement                                      mattpocock/skills
+implement-spec                                 mattpocock/skills
+improve-codebase-architecture                  mattpocock/skills
+pr                                             mattpocock/skills
+prototype                                      mattpocock/skills
+research                                       mattpocock/skills
+retro                                          mattpocock/skills
+setup-matt-pocock-skills                       mattpocock/skills
+setup-pre-commit                               mattpocock/skills
+tdd                                            mattpocock/skills
+teach                                          mattpocock/skills
+to-questionnaire                               mattpocock/skills
+to-spec                                        mattpocock/skills
+to-tickets                                     mattpocock/skills
+triage                                         mattpocock/skills
+wait-what                                      mattpocock/skills
+wayfinder                                      mattpocock/skills
+wizard                                         mattpocock/skills
+writing-for-agents                             mattpocock/skills

@@ -33,6 +33,19 @@ npx -y skills@1.7.0 add <source> -g -y -s <name> [<name> …] -a claude-code ope
 - **work.txt**: installed only with `./install.sh --work`. These sources are on the work GitLab
   and fail without access.
 
+**Same name in both manifests** (currently `code-review`: Matt Pocock's in personal.txt, the
+work one in work.txt): with `--work` the work.txt entry wins. `install.sh` installs only the work
+version, and if the personal version is already installed (per `~/.agents/.skill-lock.json`) it
+removes it first with `skills remove`. Without `--work`, the personal version is used.
+
+### Matt Pocock's skills and per-repo setup
+
+`personal.txt` installs all of [`mattpocock/skills`](https://github.com/mattpocock/skills);
+`orca-features` (in `skills/own/`) uses them for its design phase and its workers. Most of
+them read a per-repo config (issue tracker, triage labels, `GLOSSARY.md`/ADR layout) written by
+`/setup-matt-pocock-skills`. Run that once in each new repo, or let `/orca-features` do it:
+on its first run in a repo without an `## Agent skills` block it offers the same setup.
+
 ### Add a skill
 
 Either install it and capture it:

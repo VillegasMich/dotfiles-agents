@@ -106,28 +106,46 @@ step_skills() {
     return 0
   fi
 
-  local manifests="$REPO_DIR/skills/personal.txt"
-  [ "$WORK" = 1 ] && manifests="$manifests $REPO_DIR/skills/work.txt"
+  # Skills to install as "<name>\t<source>". With --work, a work.txt entry wins over a
+  # personal.txt entry of the same name (e.g. code-review): both would install into the same
+  # folder, so only one may. `overridden` holds the personal entries that lost.
+  local entries overridden=""
+  entries="$(manifest_entries "$REPO_DIR/skills/personal.txt")"
+  if [ "$WORK" = 1 ]; then
+    overridden="$(awk -F'\t' 'NR == FNR { w[$1] = $2; next } ($1 in w) && w[$1] != $2' \
+      <(manifest_entries "$REPO_DIR/skills/work.txt") <(printf '%s\n' "$entries"))"
+    entries="$(printf '%s\n%s\n' "$(manifest_entries "$REPO_DIR/skills/work.txt")" "$entries" |
+      awk -F'\t' 'NF == 2 && !seen[$1]++')"
+  fi
 
-  # A skill is missing when its canonical copy or any agent's link to it is missing.
-  local name src agent dir missing="" m
-  for m in $manifests; do
-    while IFS=$'\t' read -r name src <&3; do
-      if [ ! -e "$AGENTS_HOME/skills/$name" ]; then
-        info "$name: not installed"
+  # A skill is missing when its canonical copy or any agent's link to it is missing, or when
+  # it is still the overridden personal version.
+  local name src agent dir missing="" lost installed_src
+  while IFS=$'\t' read -r name src <&3; do
+    if [ ! -e "$AGENTS_HOME/skills/$name" ]; then
+      info "$name: not installed"
+      missing="$missing$name"$'\t'"$src"$'\n'
+      continue
+    fi
+    lost="$(printf '%s\n' "$overridden" | awk -F'\t' -v n="$name" '$1 == n { print $2 }')"
+    if [ -n "$lost" ] && [ -f "$SKILL_LOCK" ]; then
+      installed_src="$(jq -r --arg n "$name" '.skills[$n].source // empty' "$SKILL_LOCK")"
+      if [ "$installed_src" = "$lost" ]; then
+        info "$name: installed from $lost, but work.txt wants $src; replacing"
+        run npx -y "$SKILLS_CLI" remove "$name" -g -y </dev/null
         missing="$missing$name"$'\t'"$src"$'\n'
         continue
       fi
-      for agent in $SKILL_AGENTS; do
-        dir="$(agent_skills_dir "$agent")"
-        if [ -n "$dir" ] && [ ! -e "$dir/$name" ]; then
-          info "$name: not linked for $agent"
-          missing="$missing$name"$'\t'"$src"$'\n'
-          break
-        fi
-      done
-    done 3< <(manifest_entries "$m")
-  done
+    fi
+    for agent in $SKILL_AGENTS; do
+      dir="$(agent_skills_dir "$agent")"
+      if [ -n "$dir" ] && [ ! -e "$dir/$name" ]; then
+        info "$name: not linked for $agent"
+        missing="$missing$name"$'\t'"$src"$'\n'
+        break
+      fi
+    done
+  done 3< <(printf '%s\n' "$entries" | awk -F'\t' 'NF == 2')
 
   if [ -z "$missing" ]; then
     ok "all skills already installed"
