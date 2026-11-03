@@ -1,28 +1,36 @@
 ---
 name: orca-features
 description: >-
-  Start one or more new features in parallel, one supervised Orca agent per
-  feature, each in its own branch + worktree. The current session acts as the
-  coordinator: agrees the plan with the user, spawns workers via `orca
-  orchestration`, relays every implementation doubt to the user, verifies each
+  Design and build features or bug fixes with Matt Pocock's engineering flow,
+  then implement them in parallel with one supervised Orca agent per ticket,
+  each in its own branch + worktree. The current session is the coordinator:
+  grills the user (grilling + domain-modeling, leaving GLOSSARY/ADRs), turns
+  the result into a spec and tracer-bullet tickets when the work is big
+  enough, spawns workers via `orca orchestration` that build test-first and
+  self-review, relays every implementation doubt to the user, verifies each
   branch, and after explicit user approval opens the PRs and merges them into
   the target branch (default branch unless told otherwise). Works in any git
   repo; project conventions come from its CLAUDE.md / AGENTS.md. Use when the
   user says "start a feature", "new features with orca", "spawn agents per
-  feature", "/orca-features", or lists several features to build in parallel.
+  feature", "grill then build with orca", "/orca-features", or lists several
+  features or fixes to build in parallel.
 ---
 
 # Orca features — coordinator workflow
 
 You are the **coordinator**. You never implement feature code yourself; workers
-do. You own: planning with the user, briefs, answering/relaying questions,
-independent verification, PRs and merges.
+do. You own: designing with the user (Matt Pocock flow), briefs, answering/relaying
+questions, independent verification, PRs and merges.
 
 Hard gates (never skip):
 
-1. **Plan gate** — user approves the feature list + design decisions before any worker starts.
+1. **Plan gate** — user approves the ticket list + design decisions before any worker starts.
 2. **Doubt gate** — a worker question that is a design/behavior choice goes to the user, not answered by you.
-3. **Merge gate** — no push, PR, or merge until the user explicitly approves *that* feature after verification.
+3. **Merge gate** — no push, PR, or merge until the user explicitly approves *that* ticket after verification.
+
+Unit of work: **1 ticket = 1 worker = 1 branch/worktree = 1 PR** into the target.
+Blocking edges between tickets become **waves**: a blocked ticket starts only after
+every blocker is merged, based on the updated target.
 
 ## 0. Resolve the Orca CLI, load its guide, learn the project
 
@@ -36,8 +44,12 @@ Hard gates (never skip):
 - Build the **project profile** from `<repo>/CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
   README and CI config (`.github/workflows/*`, `Makefile`, `justfile`, `package.json`
   scripts, `Cargo.toml`, `pyproject.toml`, …). Record:
-  - **checks** — format, lint, test (and dependency audit) commands CI runs;
+  - **checks** — format, lint, typecheck, test (and dependency audit) commands CI runs;
   - **read-first docs** and **hard rules** (security, style, "never do X");
+  - **domain docs** — `GLOSSARY.md` / `GLOSSARY-MAP.md`, `docs/adr/`;
+  - **issue tracker + domain layout** — the `## Agent skills` block in CLAUDE.md /
+    AGENTS.md and `docs/agents/*.md`, written by `/setup-matt-pocock-skills`. Missing →
+    run the **repo bootstrap** below before designing anything;
   - **dev server** — command, default port, how to override the port;
   - **shared resources** workers must not touch (user's own dev server, real services,
     containers, databases) and how to create throwaway ones;
@@ -48,28 +60,110 @@ Hard gates (never skip):
     defaults below.
   Anything you cannot determine and that matters → ask the user in step 1.
 
-## 1. Plan with the user (plan gate)
+### Repo bootstrap (first run in a repo only)
 
-1. Read the read-first docs enough to place each feature.
-2. For each feature, draft: slug (kebab-case, becomes branch `<prefix>/<slug>`),
-   goal, scope / out of scope, files likely touched, acceptance criteria, open questions.
-3. Detect **overlap**: features touching the same files (routers, shared JS/CSS,
-   central docs) will conflict at merge. Propose either ownership boundaries or
-   ordering (dependency → later wave).
-4. Ask the user the open questions with `AskUserQuestion` (batch ≤4 per call; give a
-   recommended option first). The user wants to decide design together — do not assume.
-5. Confirm: target branch (default: repo default branch, `gh repo view --json defaultBranchRef`),
-   agent (default `claude`), and any model/effort override.
-6. Show the final plan table (slug · goal · port · base · depends-on) and get an explicit "go".
+The Matt Pocock skills (`to-spec`, `to-tickets`, `code-review`, `triage`, …) read the
+repo's tracker and domain-doc config; without it they stall or guess. If the repo has no
+`## Agent skills` block:
 
-## 2. Write one brief per feature
+1. Tell the user this repo isn't set up for the Matt Pocock skills yet and offer to set it
+   up now (recommended) or skip.
+2. **Set up** → read `~/.agents/skills/setup-matt-pocock-skills/SKILL.md` and follow it
+   (it is user-only, so not via the Skill tool): explore, propose the issue tracker
+   (GitHub/GitLab from the remote, else local markdown), triage labels, single- vs
+   multi-context domain docs, confirm the drafts with the user, then write the
+   `## Agent skills` block and `docs/agents/*.md` (plus `GLOSSARY.md` / `docs/adr/`
+   when the domain-docs choice creates them).
+3. These files go to the target branch through the step 1b docs PR, together with
+   whatever the design phase adds, so workers' `code-review` can read them.
+4. **Skip** → use local markdown for this run (layout below) and say so in the plan.
+
+Local-markdown layout: spec at `.scratch/<feature-slug>/spec.md`, tickets at
+`.scratch/<feature-slug>/issues/<NN>-<slug>.md`, a `Status:` line near the top of each,
+comments under `## Comments`.
+
+### Matt Pocock skills: how to run them
+
+Several of them are user-only (`disable-model-invocation`), so the Skill tool refuses them.
+Run them like this, never from memory:
+
+| Step | How |
+|---|---|
+| grill (= `/grill-with-docs`) | Skill tool: `grilling`, then `domain-modeling` |
+| prototype | Skill tool: `prototype` |
+| research | Skill tool: `research` |
+| module shape / seams | Skill tool: `codebase-design` |
+| spec (`/to-spec`) | Read `~/.agents/skills/to-spec/SKILL.md` and follow it |
+| tickets (`/to-tickets`) | Read `~/.agents/skills/to-tickets/SKILL.md` and follow it |
+
+A file missing under `~/.agents/skills/` → tell the user the skill isn't installed
+(`npx skills add mattpocock/skills -g`) and stop that step instead of improvising it.
+
+## 1. Design with the user (ends at the plan gate)
+
+Keep this whole step in **one unbroken context**: no compaction or clearing until the
+tickets are approved.
+
+1. **Grill.** Call the Skill tool with `grilling`, then `domain-modeling`, and run the
+   interview over everything the user asked for. Rounds, recommended answers and
+   "facts are your job, decisions are the user's" come from `grilling`. `domain-modeling`
+   updates `GLOSSARY.md` and writes ADRs for hard-to-reverse decisions as you go.
+   Look facts up with subagents; never ask the user something the repo can answer.
+2. **Prototype detour (only if needed).** If a question can only be settled with
+   runnable code (state model, business logic, a UI to look at), call the Skill tool with
+   `prototype`, show it to the user, fold the verdict back into the grilling.
+   Ask before starting a prototype; it costs a detour.
+3. **Choose the path** and confirm it with the user in one question:
+   - **Direct** — the work is one or a few small, independent pieces (a bug fix, a
+     contained feature), each fitting one worker session. Skip spec and tickets: each
+     piece becomes one ticket written by you from the grilling, in the to-tickets
+     ticket shape (what to build, blocked by, acceptance criteria), kept in the scratchpad.
+   - **Spec** — multi-ticket work or anything with dependencies. Follow `to-spec`
+     (it confirms the **test seams** with the user and publishes the spec), then
+     `to-tickets` (it quizzes the user on granularity and blocking edges, then
+     publishes one ticket per slice). Both publish to the tracker from step 0.
+   Several unrelated features in one request → each gets its own path and slug.
+4. **Seams.** Workers build with `tdd`, which only tests at **pre-agreed seams**, and
+   they cannot ask the user directly. Make sure every ticket has its seams settled
+   (from `to-spec`, or ask now on the direct path).
+5. **Orca plan.** For each ticket: slug (kebab-case → branch `<prefix>/<slug>`), files
+   likely touched, dev port. Detect **overlap**: tickets touching the same files
+   (routers, shared JS/CSS, central docs) will conflict at merge — propose ownership
+   boundaries or add a blocking edge.
+6. Confirm target branch (default: repo default branch, `gh repo view --json defaultBranchRef`),
+   agent (default `claude`), and any model/effort override. Batch open questions in
+   `AskUserQuestion` (≤4 per call, recommended option first). The user wants to decide
+   design together — do not assume.
+7. Show the final plan table (slug · ticket ref · goal · port · wave · blocked-by) and
+   get an explicit "go".
+
+## 1b. Land the design docs (before any worker starts)
+
+Workers branch from the target, so they only see what is committed there. Check
+`git status` for files the bootstrap and design phase produced: the `## Agent skills`
+block, `docs/agents/*.md`, `GLOSSARY.md`, new ADRs, and the local spec/tickets if
+`.scratch/` is not git-ignored.
+
+- Nothing produced, or only ignored files → skip.
+- Otherwise, with the user's approval (merge gate applies), land them first as a small
+  docs PR: branch `<prefix>/<feature-slug>-design` off the target, commit in the
+  project's style, push, PR, merge, then `git checkout <target> && git pull --ff-only`.
+  If the user prefers not to, inline the relevant glossary terms and ADRs into each brief.
+
+Local tickets/spec that stay ignored are still readable by workers through their
+**absolute** path in the main checkout; put that path in each brief.
+
+## 2. Write one brief per ticket
 
 Build each brief in the scratchpad from `references/worker-brief.md`, filling every
-placeholder from the plan and the project profile. If the project is Rust (`Cargo.toml`),
-also inline the full text of `references/rust-guidelines.md`; for other languages, inline
-nothing extra unless the project ships its own guidelines. Workers run in other worktrees
-and cannot read this skill folder — inline everything they need. The brief must satisfy
-the Task-spec contract: Target, Change, Constraints, Ownership, Observable acceptance.
+placeholder from the ticket, the spec, the grilling decisions and the project profile.
+Inline the full ticket text and the agreed seams; add a pointer (issue URL/number or
+absolute path) to the ticket and spec so the worker's `code-review` can find them.
+If the project is Rust (`Cargo.toml`), also inline the full text of
+`references/rust-guidelines.md`; for other languages, inline nothing extra unless the
+project ships its own guidelines. Workers run in other worktrees and cannot read this
+skill folder — inline everything they need. The brief must satisfy the Task-spec
+contract: Target, Change, Constraints, Ownership, Observable acceptance.
 
 Per worker, unless the project says otherwise:
 
@@ -80,7 +174,7 @@ Per worker, unless the project says otherwise:
 ## 3. Spawn workers
 
 ```sh
-orca orchestration run-create --objective "Features: <slug1>, <slug2>" --json
+orca orchestration run-create --objective "Tickets: <slug1>, <slug2>" --json
 orca orchestration worker-start \
   --spec "$(cat <scratchpad>/brief-<slug>.md)" \
   --task-title "<slug>" \
@@ -88,9 +182,10 @@ orca orchestration worker-start \
   --repo path:<repo> --agent claude --setup run --json
 ```
 
-- Start the whole independent wave before waiting. Dependent features: start after their
-  dependency is merged, with `--base-branch` on the updated target.
-- Record per feature: task id, dispatch id, terminal handle, worktree path, branch.
+- Start the whole **frontier** (tickets with no unmerged blockers) before waiting.
+  Blocked tickets: start once all their blockers are merged, with `--base-branch` on
+  the updated target.
+- Record per ticket: ticket ref, task id, dispatch id, terminal handle, worktree path, branch.
 - `worker-start` exits non-zero → do **not** relaunch; read `failedStage` /
   `residualResources` and load `references/recovery-and-cleanup.md` from the Orca guide.
 - Tell the user which agents are running and where (worktree paths) so they can watch in the Orca app.
@@ -106,15 +201,19 @@ orca orchestration check --wait --types "worker_done,escalation,question" --time
 For every message in the delivery, before `--ack`:
 
 - **question** — classify:
-  - Already decided in the approved plan or the project docs → reply citing the source.
-  - Anything else (API shape, UX, naming visible to users, new dependency, new config/env
-    var, scope change, trade-off) → `AskUserQuestion` to the user, prefixed with the slug,
-    with the worker's options + your recommendation. Reply with the user's answer verbatim
-    plus any context: `orca orchestration reply --id <message_id> --body "..." --json`.
+  - Already decided in the grilling, spec, ticket, ADRs or project docs → reply citing
+    the source.
+  - Anything else (API shape, UX, naming visible to users, a new test seam, new
+    dependency, new config/env var, scope change, trade-off) → `AskUserQuestion` to the
+    user, prefixed with the slug, with the worker's options + your recommendation.
+    Reply with the user's answer verbatim plus any context:
+    `orca orchestration reply --id <message_id> --body "..." --json`.
+    A decision that changes the design → also record it (ADR / glossary / ticket
+    comment) so later waves inherit it.
   - Several questions pending at once → batch them in one `AskUserQuestion` call.
 - **escalation** — summarize to the user, ask how to proceed.
 - **worker_done** — validate it matches the active dispatch, then go to step 5 for that
-  feature. Do **not** release the worker yet (it may need follow-ups).
+  ticket. Do **not** release the worker yet (it may need follow-ups).
 
 Timeouts/empty waits are checkpoints. After 3 empty waits run
 `orca orchestration worker-list --run <run_id> --json` and act on `projection.nextAction`.
@@ -130,10 +229,12 @@ git -C <wt> status --short                       # must be clean
 cd <wt> && <every check command from the project profile>
 ```
 
-Also check: the project's hard rules respected, docs updated in the same branch when a
-documented decision changed, roadmap/changelog ticked if the project keeps one, commit
-style matches. For UI changes, take a screenshot on the worker's port (headless browser,
-per the project's testing notes if any) and show it to the user.
+Also check: every acceptance criterion of the ticket is met, tests sit at the agreed
+seams and test behavior (not internals), the worker's `code-review` findings were
+addressed, the project's hard rules respected, docs/ADRs updated in the same branch
+when a documented decision changed, roadmap/changelog ticked if the project keeps one,
+commit style matches. For UI changes, take a screenshot on the worker's port (headless
+browser, per the project's testing notes if any) and show it to the user.
 
 Problems → send a follow-up to the **same terminal** as a new dispatch:
 
@@ -143,15 +244,15 @@ orca orchestration worker-start --spec "<fix list>" --terminal <handle> --worktr
 
 ## 6. User review (merge gate)
 
-Present per feature: commits, `git diff --stat <target>...<branch>`, check results,
-screenshot if UI, deviations from plan, and how to try it (exact command with the
-worker's port, from the brief).
+Present per ticket: commits, `git diff --stat <target>...<branch>`, check results,
+code-review summary, screenshot if UI, deviations from the ticket, and how to try it
+(exact command with the worker's port, from the brief).
 Ask the user to approve, request changes (→ step 5 follow-up loop), or drop it.
-Approval of one feature does not approve the others.
+Approval of one ticket does not approve the others.
 
-## 7. PRs and merge (only approved features)
+## 7. PRs and merge (only approved tickets)
 
-Merge order: dependencies first, then smallest/least-overlapping first. For each:
+Merge order: blockers first, then smallest/least-overlapping first. For each:
 
 ```sh
 git -C <wt> fetch origin
@@ -162,12 +263,17 @@ gh pr checks <pr> --watch            # CI must be green (skip if the repo has no
 gh pr merge <pr> --<merge|squash|rebase>   # the repo's method from the profile
 ```
 
-PR body: Summary (bullets), Changes, Testing (exact commands + results), Screenshots if UI,
-Notes/decisions made with the user, then the attribution line required by the session.
+PR body: write it with the `pr` skill (Skill tool) if installed. It must also carry:
+Testing (exact commands + results), Screenshots if UI, decisions made with the user,
+the ticket link with the tracker's closing keyword (e.g. `Closes #12`), then the
+attribution line required by the session.
 
 - Conflicts that need a judgment call → ask the user, don't guess.
 - CI red → fix via follow-up dispatch to the worker, re-verify, push again.
 - After each merge, the next branch must re-merge `origin/<target>` and re-run checks.
+- After each merge: close the ticket the way the tracker doc says (local files: set
+  `Status: done` and add the PR URL under `## Comments`), then start any ticket whose
+  blockers are now all merged (back to step 2–3 for that wave).
 
 ## 8. Cleanup and report
 
@@ -177,4 +283,7 @@ Notes/decisions made with the user, then the attribution line required by the se
 - Ask before removing merged worktrees (`orca worktree rm --help`).
 - Locally: `git checkout <target> && git pull --ff-only`.
 - Remove throwaway `<project>-<slug>-*` resources left behind.
-- Final report per feature: PR URL, merge commit, outcome, anything dropped or deferred.
+- Spec path: once every ticket is merged, close the spec issue the tracker's way.
+- Final report per ticket: PR URL, merge commit, outcome, anything dropped or deferred.
+- Suggest the user run `/retro` in this session (it is user-only) if the build went
+  sideways, to turn mistakes into checks or coding standards.
